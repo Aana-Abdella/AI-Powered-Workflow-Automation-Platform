@@ -1,0 +1,432 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  emailVerified Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  refreshTokens        RefreshToken[]
+  organizationMembers  OrganizationMember[]
+  createdWorkflows     Workflow[]
+  executionLogs        ExecutionLog[]
+  apiKeys              ApiKey[]
+  auditLogs            AuditLog[]
+  notifications        Notification[]
+
+  @@index([email])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Organization {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String   @unique
+  description    String?
+  logoUrl        String?
+  webhookSecret  String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  members        OrganizationMember[]
+  workflows      Workflow[]
+  usageMetrics   UsageMetric[]
+  aiUsageLogs    AiUsageLog[]
+  billingRecords BillingRecord[]
+  apiKeys        ApiKey[]
+  subscriptions  Subscription[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
+
+  @@index([slug])
+  @@index([deletedAt])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  role           Role     @default(MEMBER)
+  joinedAt       DateTime @default(now())
+  deletedAt      DateTime?
+
+  userId         String
+  organizationId String
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([deletedAt])
+  @@map("memberships")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  revokedAt  DateTime?
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Workflow {
+  id             String        @id @default(cuid())
+  name           String
+  description    String?
+  state          WorkflowState @default(DRAFT)
+  isEnabled      Boolean       @default(false)
+  version        Int           @default(1)
+
+  trigger        Json
+  actions        Json
+
+  webhookUrl     String?       @unique
+  webhookToken   String?       @unique
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  organizationId String
+  createdById    String
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User              @relation(fields: [createdById], references: [id])
+  versions       WorkflowVersion[]
+  executions     ExecutionLog[]
+  webhookEvents  WebhookEvent[]
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([state])
+  @@index([isEnabled])
+  @@index([deletedAt])
+  @@map("workflows")
+}
+
+enum WorkflowState {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model WorkflowVersion {
+  id             String   @id @default(cuid())
+  version        Int
+  definition     Json
+  changeNote     String?
+  createdAt      DateTime @default(now())
+
+  workflowId     String
+  createdById    String
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, version])
+  @@index([workflowId])
+  @@index([createdById])
+  @@map("workflow_versions")
+}
+
+model ExecutionLog {
+  id             String          @id @default(cuid())
+  status         ExecutionStatus @default(PENDING)
+  startedAt      DateTime        @default(now())
+  completedAt    DateTime?
+  duration       Int?
+
+  input          Json?
+  output         Json?
+  error          String?
+  errorTrace     Json?
+  stepLogs       Json?
+
+  aiTokensUsed   Int?
+  aiCost         Float?
+
+  workflowId     String
+  userId         String
+
+  workflow       Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([workflowId])
+  @@index([userId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("executions")
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+  TIMEOUT
+}
+
+model WebhookEvent {
+  id              String   @id @default(cuid())
+  eventType       String
+  payload         Json
+  headers         Json?
+  signature       String?
+  signatureValid  Boolean?
+  responseStatus  Int?
+  responseBody    String?
+  processed       Boolean  @default(false)
+  processedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  workflowId      String
+  workflow        Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+  @@index([eventType])
+  @@index([processed])
+  @@map("webhook_events")
+}
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  name           String
+  keyPrefix      String
+  keyHash        String   @unique
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean  @default(true)
+  rateLimit      Int      @default(1000)
+  rateLimitUsed  Int      @default(0)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organizationId String
+  userId         String
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([keyHash])
+  @@index([deletedAt])
+  @@map("api_keys")
+}
+
+model UsageMetric {
+  id             String   @id @default(cuid())
+  date           DateTime @default(now())
+  apiCalls       Int      @default(0)
+  workflowRuns   Int      @default(0)
+  aiTokensUsed   Int      @default(0)
+  estimatedCost  Float    @default(0)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+  @@index([date])
+  @@map("usage_metrics")
+}
+
+model AiUsageLog {
+  id             String   @id @default(cuid())
+  provider       String
+  model          String
+  operation      String
+  promptTokens   Int      @default(0)
+  completionTokens Int    @default(0)
+  totalTokens    Int      @default(0)
+  estimatedCost  Float    @default(0)
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organizationId String
+  executionId    String?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([executionId])
+  @@index([createdAt])
+  @@map("ai_usage_logs")
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  displayName   String
+  description   String?
+  price         Float    @default(0)
+  interval      String   @default("month")
+
+  workflowRuns  Int      @default(0)
+  aiTokens      Int      @default(0)
+  apiCalls      Int      @default(0)
+  members       Int      @default(1)
+  webhooks      Int      @default(0)
+
+  features      Json     @default("[]")
+  isActive      Boolean  @default(true)
+  isFeatured    Boolean  @default(false)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                  String   @id @default(cuid())
+  status              SubscriptionStatus @default(ACTIVE)
+
+  organizationId      String   @unique
+  planId              String
+
+  currentPeriodStart  DateTime
+  currentPeriodEnd    DateTime
+  cancelAtPeriodEnd   Boolean  @default(false)
+
+  stripeCustomerId    String?
+  stripeSubscriptionId String?
+  stripePriceId       String?
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan                Plan         @relation(fields: [planId], references: [id])
+
+  @@index([organizationId])
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+}
+
+model BillingRecord {
+  id               String   @id @default(cuid())
+  periodStart      DateTime
+  periodEnd        DateTime
+  workflowRuns     Int      @default(0)
+  aiTokensUsed     Int      @default(0)
+  subtotal         Float    @default(0)
+  overage          Float    @default(0)
+  total            Float    @default(0)
+  currency         String   @default("USD")
+  status           String   @default("pending")
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  organizationId   String
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([periodStart, periodEnd])
+  @@map("billing_records")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  userId         String?
+  organizationId String?
+
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id             String   @id @default(cuid())
+  type           NotificationType
+  title          String
+  message        String
+  data           Json?
+  read           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  userId         String
+  organizationId String?
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([read])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  WORKFLOW_RUN
+  WORKFLOW_ERROR
+  TEAM_INVITE
+  BILLING
+  SYSTEM
+}

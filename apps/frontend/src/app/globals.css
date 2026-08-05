@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #0b1120;
+    --card: #111827;
+    --border: #1f2937;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --primary: #6366f1;
+  }
+
+  * {
+    @apply border-slate-700;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
+    background-image: radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.12), transparent 30%),
+      radial-gradient(circle at 80% 10%, rgba(34, 197, 94, 0.08), transparent 25%);
+  }
+
+  h1 {
+    font-size: 2.25rem;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+    line-height: 1.25;
+  }
+
+  h3 {
+    font-size: 1.375rem;
+    line-height: 1.3;
+  }
+
+  p,
+  li,
+  td,
+  th,
+  label,
+  input,
+  button,
+  textarea,
+  select {
+    line-height: 1.5;
+  }
+}
+
+@layer utilities {
+  .card-surface {
+    @apply rounded-xl border border-slate-700 bg-slate-800 shadow-card;
+  }
+
+  .btn-primary {
+    @apply rounded-md bg-primary-500 px-4 py-2 text-sm font-medium text-white transition duration-150 ease-in-out hover:bg-primary-400 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-50 transition duration-150 ease-in-out hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}

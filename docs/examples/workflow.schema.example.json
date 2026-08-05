@@ -1,0 +1,62 @@
+{
+  "id": "wf_lead_qualification_v3",
+  "name": "Lead Qualification Pipeline",
+  "organization_id": "org_8f2a",
+  "state": "ACTIVE",
+  "version": 3,
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "path": "/lead-intake",
+      "method": "POST",
+      "signature_header": "x-flowforge-signature"
+    }
+  },
+  "steps": [
+    {
+      "id": "step_validate",
+      "type": "action",
+      "action": "schema.validate",
+      "config": {
+        "required": ["email", "company", "message"]
+      }
+    },
+    {
+      "id": "step_ai_summary",
+      "type": "ai",
+      "action": "summarize",
+      "config": {
+        "model": "gpt-4.1-mini",
+        "prompt": "Summarize and classify lead intent."
+      }
+    },
+    {
+      "id": "step_http_crm",
+      "type": "http",
+      "action": "request",
+      "config": {
+        "method": "POST",
+        "url": "https://crm.acme.com/api/leads",
+        "headers": {
+          "Authorization": "Bearer {{secrets.crm_token}}"
+        }
+      }
+    },
+    {
+      "id": "step_db_audit",
+      "type": "database",
+      "action": "insert",
+      "config": {
+        "table": "lead_ingestion_audit"
+      }
+    }
+  ],
+  "timeouts": {
+    "workflow_ms": 120000,
+    "step_default_ms": 30000
+  },
+  "retry": {
+    "attempts": 3,
+    "backoff": "exponential"
+  }
+}

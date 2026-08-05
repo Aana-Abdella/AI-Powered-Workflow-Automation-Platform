@@ -1,0 +1,18 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Frontend
+        run: cd apps/frontend && npm ci && npm run lint && npm run type-check && npm run build
+      - name: Backend
+        run: cd apps/backend && pip install -r requirements.txt && pytest
+

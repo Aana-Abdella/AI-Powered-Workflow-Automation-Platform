@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import LogEntry, LogStatusEnum, UsageSummary, User, Workflow
+from app.schemas.workflow import WorkflowDefinition
 from app.services.utils import generate_webhook_key
+
+
+DEFAULT_DEFINITION = {
+    "trigger": {"type": "webhook", "config": {}},
+    "steps": [{"id": "ai-1", "type": "ai", "operation": "summarize", "config": {}}],
+}
 
 
 class WorkflowService:
@@ -28,15 +35,17 @@ class WorkflowService:
             "webhookUrl": f"{self.settings.backend_public_url}/api/webhook/{workflow.webhook_key}",
             "isActive": workflow.is_active,
             "createdAt": workflow.created_at,
+            "definition": workflow.definition or DEFAULT_DEFINITION,
         }
 
-    def create(self, *, user: User, name: str) -> dict:
+    def create(self, *, user: User, name: str, definition: WorkflowDefinition | None = None) -> dict:
         workflow = Workflow(
             tenant_id=user.tenant_id,
             user_id=user.id,
             name=name,
             webhook_key=generate_webhook_key(),
             is_active=True,
+            definition=(definition.model_dump(mode="json") if definition else DEFAULT_DEFINITION),
         )
         self.db.add(workflow)
         self.db.commit()
@@ -57,7 +66,7 @@ class WorkflowService:
         self._ensure_access(user=user, workflow=workflow)
         return self._build_response(workflow)
 
-    def update(self, *, user: User, workflow_id: str, name: str | None, is_active: bool | None) -> dict:
+    def update(self, *, user: User, workflow_id: str, name: str | None, is_active: bool | None, definition: WorkflowDefinition | None = None) -> dict:
         workflow = self.db.query(Workflow).filter(Workflow.id == workflow_id).first()
         if not workflow:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
@@ -67,6 +76,8 @@ class WorkflowService:
             workflow.name = name
         if is_active is not None:
             workflow.is_active = is_active
+        if definition is not None:
+            workflow.definition = definition.model_dump(mode="json")
 
         workflow.updated_at = datetime.now(tz=timezone.utc)
         self.db.commit()
@@ -82,7 +93,7 @@ class WorkflowService:
         self.db.commit()
 
     def set_active(self, *, user: User, workflow_id: str, active: bool) -> dict:
-        return self.update(user=user, workflow_id=workflow_id, name=None, is_active=active)
+        return self.update(user=user, workflow_id=workflow_id, name=None, is_active=active, definition=None)
 
     def enqueue_webhook(self, *, workflow_key: str, text: str) -> dict:
         workflow = self.db.query(Workflow).filter(Workflow.webhook_key == workflow_key).first()

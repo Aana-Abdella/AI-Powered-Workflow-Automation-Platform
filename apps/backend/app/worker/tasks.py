@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from celery import Task
 
 from app.db.session import SessionLocal
-from app.models import LogEntry, LogStatusEnum, UsageSummary
+from app.models import LogEntry, LogStatusEnum, UsageSummary, Workflow
 from app.services.ai_service import AIService
 from app.worker.celery_app import celery_app
 
@@ -18,6 +18,23 @@ def _increment_usage(summary: UsageSummary | None, *, success: bool) -> None:
         summary.failed_executions += 1
 
 
+def _run_definition(definition: dict, text: str) -> str:
+    """Run the deliberately small Phase 1 action set in declaration order."""
+    value = text
+    for step in definition.get("steps", []):
+        step_type = step.get("type")
+        if step_type == "ai":
+            operation = step.get("operation", "summarize")
+            if operation != "summarize":
+                raise ValueError(f"Unsupported AI operation: {operation}")
+            value = AIService().summarize(value)
+        elif step_type == "http":
+            raise ValueError("HTTP actions are reserved for the connector phase")
+        else:
+            raise ValueError(f"Unsupported workflow step: {step_type}")
+    return value
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=3, name="process_log_task")
 def process_log_task(self: Task, log_id: str) -> None:
     db = SessionLocal()
@@ -30,8 +47,10 @@ def process_log_task(self: Task, log_id: str) -> None:
         log.attempts += 1
         db.commit()
 
-        ai_service = AIService()
-        summary = ai_service.summarize(log.input_text)
+        workflow = db.query(Workflow).filter(Workflow.id == log.workflow_id).first()
+        if not workflow:
+            raise ValueError("Workflow not found")
+        summary = _run_definition(workflow.definition, log.input_text)
 
         log.output_text = summary
         log.status = LogStatusEnum.SUCCESS

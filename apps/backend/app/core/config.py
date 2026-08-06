@@ -1,8 +1,8 @@
 from functools import lru_cache
-from typing import List
+from typing import Annotated, List
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = "gpt-4o-mini"
 
-    cors_origins: List[str] = Field(default=["http://localhost:3000"], alias="CORS_ORIGINS")
+    cors_origins: Annotated[List[str], NoDecode] = Field(
+        default=["http://localhost:3000"], alias="CORS_ORIGINS"
+    )
 
     auth_rate_limit: str = "10/minute"
     webhook_rate_limit: str = "60/minute"

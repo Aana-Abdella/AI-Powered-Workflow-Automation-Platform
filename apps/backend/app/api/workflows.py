@@ -20,7 +20,7 @@ def create_workflow(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    workflow = WorkflowService(db).create(user=current_user, name=payload.name)
+    workflow = WorkflowService(db).create(user=current_user, name=payload.name, definition=payload.definition)
     SystemLogService(db).create(event="WORKFLOW_CREATE", message=f"Workflow created: {payload.name}", actor=current_user)
     return success_response(workflow, "Workflow created")
 
@@ -58,6 +58,7 @@ def update_workflow(
         workflow_id=workflow_id,
         name=payload.name,
         is_active=payload.isActive,
+        definition=payload.definition,
     )
     return success_response(workflow, "Workflow updated")
 

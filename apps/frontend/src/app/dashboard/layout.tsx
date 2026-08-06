@@ -7,7 +7,7 @@ import { Bell, ChevronDown, LogOut, Menu, Search, X } from 'lucide-react';
 
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/components/ui/toast';
-import { authAPI } from '@/lib/api';
+import { authAPI } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 
 interface NavItem {
@@ -19,6 +19,7 @@ interface NavItem {
 const primaryNav: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Workflows', href: '/dashboard/workflows' },
+  { label: 'Integrations', href: '/dashboard/integrations' },
   { label: 'Logs', href: '/dashboard/executions' },
   { label: 'API Keys', href: '/dashboard/api-keys' },
   { label: 'Analytics', href: '/dashboard/analytics' },
@@ -67,14 +68,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Spinner size={34} />
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-50">
+        <div className="text-center">
+          <Spinner size={34} />
+          <p className="mt-4 text-sm text-slate-400">Checking your session...</p>
+        </div>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-slate-50">
+        <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-8 text-center shadow-card">
+          <h1 className="text-xl font-semibold">Sign in required</h1>
+          <p className="mt-2 text-sm text-slate-400">Sign in to view your integrations and connect accounts.</p>
+          <button onClick={() => router.push('/login')} className="btn-primary mt-6">
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
